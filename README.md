@@ -6,6 +6,9 @@ plot y=((log2((a-1)x + 1)) / (log2(a))) and y=((a^x - 1)/(a-1)) where a=24 from 
 ```
 Upper graph will show concave interpolation, and below graph will show convex interpolation. Change *a* to modify strength.
 
+## Example
+![Example](example.gif)<br/>
+
 ## Basic usage
 
 ```java
