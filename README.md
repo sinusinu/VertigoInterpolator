@@ -11,21 +11,22 @@ VertigoInterpolator is single-file Java library that interpolates linear input o
 
 ```java
 // creates new VertigoInterpolator with given options.
-// incremental, concave, 3-second interval, strength of 36, no repeat.
 VertigoInterpolator interpolator = new VertigoInterpolator(
-    true,                                   // incremental
-    true,                                   // concave
+    true,                                   // incremental?
+    true,                                   // concave?
     3f,                                     // interval (seconds)
     36,                                     // strength
     VertigoInterpolator.REPEATMODE_NOREPEAT // repeat mode
 );
 
 // in rendering loop or something:
-interpolator.update(deltaTime);
-float interpolatedValue = interpolator.getValueInterpolated();
+while (true) {
+    interpolator.update(deltaTime);
+    float interpolatedValue = interpolator.getValueInterpolated();
+}
 
-// interpolatedValue will go from 0 to 1 (incremental) with fast acceleration
-// in beginning (concave) in 3 seconds (interval).
+// interpolatedValue will go from 0 to 1 (incremental)
+// with fast acceleration in beginning (concave) in 3 seconds (interval).
 // after 3 seconds, calling interpolator.update will do nothing
 // since we set its repeat mode as REPEATMODE_NOREPEAT.
 // if it's set to anything else, you can keep calling interpolator.update()
