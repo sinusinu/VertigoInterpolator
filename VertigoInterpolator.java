@@ -1,5 +1,5 @@
 /*
- * Copyright © 2019-2020 sinu <cpu344@gmail.com>
+ * Copyright © 2019-2021 Woohyun Shin
  * This work is free. You can redistribute it and/or modify it under the
  * terms of the Do What The Fuck You Want To Public License, Version 2,
  * as published by Sam Hocevar. See http://www.wtfpl.net/ for more details.
@@ -12,7 +12,6 @@
  * To preview interpolated value, type this into WolframAlpha:<br/>
  * <blockquote><code>plot y=((log2((a-1)x + 1)) / (log2(a))) and y=((a^x - 1)/(a-1)) where a=24 from x=0 to x=1</code></blockquote>
  * Upper graph will show concave interpolation, and below graph will show convex interpolation. Change <code>a</code> to modify strength.
- * @author sinu
  */
 public class VertigoInterpolator {
     /** stop updating value when it reaches its final value. */
