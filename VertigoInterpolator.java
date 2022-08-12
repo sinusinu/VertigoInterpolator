@@ -1,9 +1,16 @@
 /*
- * Copyright © 2019-2021 Woohyun Shin
+ * Copyright © 2019-2022 Woohyun Shin (sinusinu)
  * This work is free. You can redistribute it and/or modify it under the
  * terms of the Do What The Fuck You Want To Public License, Version 2,
  * as published by Sam Hocevar. See http://www.wtfpl.net/ for more details.
  */
+
+ /*
+  * Changelog
+  * ===
+  * v1.1
+  * - Changed REPEATMODE_*, isIncremental, isConcave to RepeatMode, Direction, Curvature enums.
+  */
 
 /**
  * Simple interpolator for general use.<br/>
@@ -14,58 +21,73 @@
  * Upper graph will show concave interpolation, and below graph will show convex interpolation. Change <code>a</code> to modify strength.
  */
 public class VertigoInterpolator {
-    /** stop updating value when it reaches its final value. */
-    public static final int REPEATMODE_NOREPEAT = 0;
-    /** reset value to its initial state when it reaches its final value. */
-    public static final int REPEATMODE_REPEAT = 1;
-    /** make value go back to its origin when it reaches its final value. */
-    public static final int REPEATMODE_PINGPONG = 2;
+    public enum RepeatMode {
+        /** stop updating value when it reaches its final value. */
+        NoRepeat,
+        /** reset value to its initial state when it reaches its final value. */
+        Repeat,
+        /** make value go backwards when it reaches its final value. */
+        PingPong
+    };
 
-    private boolean isIncremental;
-    private boolean isConcave;
+    public enum Direction {
+        /** value go from 0 to 1 on update. */
+        Incremental,
+        /** value go from 1 to 0 on update. */
+        Decremental
+    };
+
+    public enum Curvature {
+        /** value is interpolated with concave function. */
+        Concave,
+        /** value is interpolated with convex function. */
+        Convex
+    }
+
+    private Direction direction;
+    private Curvature curvature;
     private float interval;
     private float valueRaw;
     private float valueInterpolated;
     private int strength;
-    private int repeatMode;
+    private RepeatMode repeatMode;
 
     /**
-     * Initialize VertigoInterpolator with default strength of 24 and repeatMode of {@link #REPEATMODE_NOREPEAT}.
-     * @param isIncremental Set to true if value should be increased upon update (from 0 to 1). If false, value will be decreased (from 1 to 0).
-     * @param isConcave Set to true if the interpolator should use concave function for interpolation. If false, interpolator will use convex function.
+     * Initialize VertigoInterpolator with default strength of 24 and repeatMode of NoRepeat.
+     * @param direction Set whether value should be increased (from 0 to 1) or decreased (from 1 to 0) upon update.
+     * @param curvature Set whether the interpolator should use concave function or convex function for interpolation.
      * @param interval The interval in seconds.
      */
-    public VertigoInterpolator(boolean isIncremental, boolean isConcave, float interval) {
-        this(isIncremental, isConcave, interval, 24, REPEATMODE_NOREPEAT);
+    public VertigoInterpolator(Direction direction, Curvature curvature, float interval) {
+        this(direction, curvature, interval, 24, RepeatMode.NoRepeat);
     }
 
     /**
-     * Initialize VertigoInterpolator with specified strength and default repeatMode of {@link #REPEATMODE_NOREPEAT}.
-     * @param isIncremental Set to true if value should be increased upon update (from 0 to 1). If false, value will be decreased (from 1 to 0).
-     * @param isConcave Set to true if the interpolator should use concave function for interpolation. If false, interpolator will use convex function.
+     * Initialize VertigoInterpolator with specified strength and default repeatMode of NoRepeat.
+     * @param direction Set whether value should be increased (from 0 to 1) or decreased (from 1 to 0) upon update.
+     * @param curvature Set whether the interpolator should use concave function or convex function for interpolation.
      * @param interval The interval in seconds.
      * @param strength The strength. Must be bigger than 1.
      */
-    public VertigoInterpolator(boolean isIncremental, boolean isConcave, float interval, int strength) {
-        this(isIncremental, isConcave, interval, strength, REPEATMODE_NOREPEAT);
+    public VertigoInterpolator(Direction direction, Curvature curvature, float interval, int strength) {
+        this(direction, curvature, interval, strength, RepeatMode.NoRepeat);
     }
 
     /**
      * Initialize VertigoInterpolator with specified strength and repeatMode.
-     * @param isIncremental Set to true if value should be increased upon update (from 0 to 1). If false, value will be decreased (from 1 to 0).
-     * @param isConcave Set to true if the interpolator should use concave function for interpolation. If false, interpolator will use convex function.
+     * @param direction Set whether value should be increased (from 0 to 1) or decreased (from 1 to 0) upon update.
+     * @param curvature Set whether the interpolator should use concave function or convex function for interpolation.
      * @param interval The interval in seconds.
      * @param strength The strength. Must be bigger than 1.
-     * @param repeatMode {@link #REPEATMODE_NOREPEAT}, {@link #REPEATMODE_REPEAT}, or {@link #REPEATMODE_PINGPONG}.
+     * @param repeatMode One of RepeatMode.
      */
-    public VertigoInterpolator(boolean isIncremental, boolean isConcave, float interval, int strength, int repeatMode) {
+    public VertigoInterpolator(Direction direction, Curvature curvature, float interval, int strength, RepeatMode repeatMode) {
         if (interval <= 0) throw new IllegalArgumentException("interval must be positive");
         if (strength <= 1) throw new IllegalArgumentException("strength must be bigger than 1");
-        if (repeatMode < 0 || repeatMode > 2) throw new IllegalArgumentException("repeatMode must be one of the REPEATMODE values");
 
-        this.isIncremental = isIncremental;
+        this.direction = direction;
+        this.curvature = curvature;
         this.interval = interval;
-        this.isConcave = isConcave;
         this.strength = strength;
         this.repeatMode = repeatMode;
 
@@ -76,7 +98,7 @@ public class VertigoInterpolator {
      * Sets the both raw and interpolated values into initial state.
      */
     public void reset() {
-        if (isIncremental) {
+        if (direction == Direction.Incremental) {
             valueRaw = 0f;
             valueInterpolated = 0f;
         } else {
@@ -90,22 +112,22 @@ public class VertigoInterpolator {
      * @param delta delta-time to progress (in seconds)
      */
     public void update(float delta) {
-        if (repeatMode == REPEATMODE_NOREPEAT) {
-            if ((isIncremental && valueRaw == 1f) || (!isIncremental && valueRaw == 0f)) return;
+        if (repeatMode == RepeatMode.NoRepeat) {
+            if ((direction == Direction.Incremental && valueRaw == 1f) || (direction == Direction.Decremental && valueRaw == 0f)) return;
         }
-        if (isIncremental) {
+        if (direction == Direction.Incremental) {
             valueRaw += delta / interval;
             if (valueRaw > 1f) {
                 switch (repeatMode) {
-                    case REPEATMODE_NOREPEAT:
+                    case NoRepeat:
                         valueRaw = 1f;
                         break;
-                    case REPEATMODE_REPEAT:
+                    case Repeat:
                         valueRaw -= 1f;
                         break;
-                    case REPEATMODE_PINGPONG:
+                    case PingPong:
                         valueRaw = 1f - (valueRaw - 1f);
-                        isIncremental = false;
+                        direction = Direction.Decremental;
                         break;
                 }
             }
@@ -113,20 +135,20 @@ public class VertigoInterpolator {
             valueRaw -= delta / interval;
             if (valueRaw < 0f) {
                 switch (repeatMode) {
-                    case REPEATMODE_NOREPEAT:
+                    case NoRepeat:
                         valueRaw = 0f;
                         break;
-                    case REPEATMODE_REPEAT:
+                    case Repeat:
                         valueRaw += 1f;
                         break;
-                    case REPEATMODE_PINGPONG:
+                    case PingPong:
                         valueRaw = -valueRaw;
-                        isIncremental = true;
+                        direction = Direction.Incremental;
                         break;
                 }
             }
         }
-        valueInterpolated = interpolateValue(valueRaw, isConcave);
+        valueInterpolated = interpolateValue(valueRaw, curvature);
     }
 
     /**
@@ -136,11 +158,11 @@ public class VertigoInterpolator {
     public void setValueRaw(float newRawValue) {
         if (newRawValue < 0f || newRawValue > 1f) throw new IllegalArgumentException("Key value must be between 0 to 1");
         valueRaw = newRawValue;
-        valueInterpolated = interpolateValue(valueRaw, isConcave);
+        valueInterpolated = interpolateValue(valueRaw, curvature);
     }
 
-    private float interpolateValue(float rawValue, boolean concave) {
-        if (concave) return (log2(((strength - 1) * rawValue) + 1) / log2(strength));
+    private float interpolateValue(float rawValue, Curvature curvature) {
+        if (curvature == Curvature.Concave) return (log2(((strength - 1) * rawValue) + 1) / log2(strength));
         else return (float)(((Math.pow(strength, rawValue)) - 1) / (strength - 1));
     }
 
@@ -157,18 +179,18 @@ public class VertigoInterpolator {
     /** Get the interpolated value. */
     public float getValueInterpolated() { return valueInterpolated; }
 
-    /** Get if the value increases on update. If true, value will go from 0 to 1. */
-    public boolean isIncremental() { return isIncremental; }
-    /** Get if the value is interpolated with concave function. If false, the value will be interpolated with convex function. */
-    public boolean isConcave() { return isConcave; }
+    /** Get whether the value increases on update (go from 0 to 1) or the opposite. */
+    public Direction getDirection() { return direction; }
+    /** Get whether the value is interpolated with concave function or convex function. */
+    public Curvature getCurvature() { return curvature; }
     /** Get the current repeat mode. */
-    public int getRepeatMode() { return repeatMode; }
+    public RepeatMode getRepeatMode() { return repeatMode; }
 
     // below functions are likely to screw something up - use at your own risk
     /** Set interval. */
     public void setInterval(float newInterval) { interval = newInterval; }
-    /** Set isIncremental. */
-    public void setIncremental(boolean newIncremental) { isIncremental = newIncremental; }
-    /** Set isConcave. */
-    public void setConcave(boolean newConcave) { isConcave = newConcave; }
+    /** Set direction. */
+    public void setDirection(Direction newDirection) { direction = newDirection; }
+    /** Set curvature. */
+    public void setCurvature(Curvature newCurvature) { curvature = newCurvature; }
 }
